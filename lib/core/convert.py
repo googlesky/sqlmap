@@ -198,6 +198,8 @@ def decodeBase64(value, binary=True, encoding=None):
     True
     >>> decodeBase64("MTIz", binary=False)
     '123'
+    >>> decodeBase64("A-B_CDE") == decodeBase64("A+B/CDE")
+    True
     >>> decodeBase64(b"MTIzNA") == b"1234"
     True
     >>> decodeBase64("MTIzNA") == b"1234"
@@ -206,11 +208,21 @@ def decodeBase64(value, binary=True, encoding=None):
     True
     """
 
+    if value is None:
+        return None
+
     padding = b'=' if isinstance(value, bytes) else '='
 
     # Reference: https://stackoverflow.com/a/49459036
     if not value.endswith(padding):
         value += 3 * padding
+
+    # Reference: https://en.wikipedia.org/wiki/Base64#URL_applications
+    # Reference: https://perldoc.perl.org/MIME/Base64.html
+    if isinstance(value, bytes):
+        value = value.replace(b'-', b'+').replace(b'_', b'/')
+    else:
+        value = value.replace('-', '+').replace('_', '/')
 
     retVal = base64.b64decode(value)
 
@@ -219,15 +231,22 @@ def decodeBase64(value, binary=True, encoding=None):
 
     return retVal
 
-def encodeBase64(value, binary=True, encoding=None):
+def encodeBase64(value, binary=True, encoding=None, padding=True, safe=False):
     """
     Returns a decoded representation of provided Base64 value
 
     >>> encodeBase64(b"123") == b"MTIz"
     True
-    >>> encodeBase64(u"123", binary=False)
-    'MTIz'
+    >>> encodeBase64(u"1234", binary=False)
+    'MTIzNA=='
+    >>> encodeBase64(u"1234", binary=False, padding=False)
+    'MTIzNA'
+    >>> encodeBase64(decodeBase64("A-B_CDE"), binary=False, safe=True)
+    'A-B_CDE'
     """
+
+    if value is None:
+        return None
 
     if isinstance(value, six.text_type):
         value = value.encode(encoding or UNICODE_ENCODING)
@@ -236,6 +255,19 @@ def encodeBase64(value, binary=True, encoding=None):
 
     if not binary:
         retVal = getText(retVal, encoding)
+
+    if safe:
+        padding = False
+
+        # Reference: https://en.wikipedia.org/wiki/Base64#URL_applications
+        # Reference: https://perldoc.perl.org/MIME/Base64.html
+        if isinstance(retVal, bytes):
+            retVal = retVal.replace(b'+', b'-').replace(b'/', b'_')
+        else:
+            retVal = retVal.replace('+', '-').replace('/', '_')
+
+    if not padding:
+        retVal = retVal.rstrip(b'=' if isinstance(retVal, bytes) else '=')
 
     return retVal
 
