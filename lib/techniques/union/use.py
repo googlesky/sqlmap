@@ -75,7 +75,7 @@ def _oneShotUnionUse(expression, unpack=True, limited=False):
     if retVal is None:
         vector = kb.injection.data[PAYLOAD.TECHNIQUE.UNION].vector
 
-        if not any((kb.rowXmlMode, kb.jsonAggMode)):
+        if not kb.jsonAggMode:
             injExpression = unescaper.escape(agent.concatQuery(expression, unpack))
             kb.unionDuplicates = vector[7]
             kb.forcePartialUnion = vector[8]
@@ -100,51 +100,34 @@ def _oneShotUnionUse(expression, unpack=True, limited=False):
 
         incrementCounter(PAYLOAD.TECHNIQUE.UNION)
 
-        if kb.rowXmlMode:
-            output = extractRegexResult(r"(?P<result>(<row.+?/>)+)", page or "")
-            if output:
-                try:
-                    root = xml.etree.ElementTree.fromstring(safeStringFormat("<root>%s</root>", getBytes(output)))
-                    retVal = ""
-                    for column in kb.dumpColumns:
-                        base64 = True
-                        for child in root:
-                            value = child.attrib.get(column, "").strip()
-                            if value and not re.match(r"\A[a-zA-Z0-9+/]+={0,2}\Z", value):
-                                base64 = False
-                                break
-
-                            try:
-                                decodeBase64(value)
-                            except (binascii.Error, TypeError):
-                                base64 = False
-                                break
-
-                        if base64:
-                            for child in root:
-                                child.attrib[column] = decodeBase64(child.attrib.get(column, ""), binary=False) or NULL
-
-                    for child in root:
-                        row = []
-                        for column in kb.dumpColumns:
-                            row.append(child.attrib.get(column, NULL))
-                        retVal += "%s%s%s" % (kb.chars.start, kb.chars.delimiter.join(row), kb.chars.stop)
-
-                except:
-                    pass
-                else:
-                    retVal = getUnicode(retVal)
-        elif kb.jsonAggMode:
-            output = extractRegexResult(r"(?P<result>%s.*?%s)" % (kb.chars.start, kb.chars.stop), page or "")
-            if output:
-                try:
-                    retVal = ""
-                    for row in json.loads(output[len(kb.chars.start):-len(kb.chars.stop)]):
-                        retVal += "%s%s%s" % (kb.chars.start, row, kb.chars.stop)
-                except:
-                    pass
-                else:
-                    retVal = getUnicode(retVal)
+        if kb.jsonAggMode:
+            if Backend.isDbms(DBMS.MSSQL):
+                output = extractRegexResult(r"%s(?P<result>.*)%s" % (kb.chars.start, kb.chars.stop), page or "")
+                if output:
+                    try:
+                        retVal = ""
+                        fields = re.findall(r'"([^"]+)":', extractRegexResult(r"{(?P<result>[^}]+)}", output))
+                        for row in json.loads(output):
+                            retVal += "%s%s%s" % (kb.chars.start, kb.chars.delimiter.join(getUnicode(row[field] or NULL) for field in fields), kb.chars.stop)
+                    except:
+                        pass
+                    else:
+                        retVal = getUnicode(retVal)
+            elif Backend.isDbms(DBMS.PGSQL):
+                output = extractRegexResult(r"(?P<result>%s.*%s)" % (kb.chars.start, kb.chars.stop), page or "")
+                if output:
+                    retVal = output
+            else:
+                output = extractRegexResult(r"%s(?P<result>.*?)%s" % (kb.chars.start, kb.chars.stop), page or "")
+                if output:
+                    try:
+                        retVal = ""
+                        for row in json.loads(output):
+                            retVal += "%s%s%s" % (kb.chars.start, row, kb.chars.stop)
+                    except:
+                        pass
+                    else:
+                        retVal = getUnicode(retVal)
         else:
             # Parse the returned page to get the exact UNION-based
             # SQL injection output
@@ -171,7 +154,7 @@ def _oneShotUnionUse(expression, unpack=True, limited=False):
 
             hashDBWrite("%s%s" % (conf.hexConvert or False, expression), retVal)
 
-        elif not any((kb.rowXmlMode, kb.jsonAggMode)):
+        elif not kb.jsonAggMode:
             trimmed = _("%s(?P<result>.*?)<" % (kb.chars.start))
 
             if trimmed:
@@ -248,31 +231,28 @@ def unionUse(expression, unpack=True, dump=False):
     # Set kb.partRun in case the engine is called from the API
     kb.partRun = getPartRun(alias=False) if conf.api else None
 
-    if Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.ORACLE) and expressionFields:
-        match = re.search(r"SELECT\s*(.+?)\bFROM", expression, re.I)
-        if match and not (Backend.isDbms(DBMS.ORACLE) and FROM_DUMMY_TABLE[DBMS.ORACLE] in expression):
-            kb.jsonAggMode = True
-            if Backend.isDbms(DBMS.MYSQL):
-                _ = expression.replace(expressionFields, "CONCAT('%s',JSON_ARRAYAGG(CONCAT_WS('%s',%s)),'%s')" % (kb.chars.start, kb.chars.delimiter, expressionFields, kb.chars.stop), 1)
-            else:
-                _ = expression.replace(expressionFields, "'%s'||JSON_ARRAYAGG(%s)||'%s'" % (kb.chars.start, ("||'%s'||" % kb.chars.delimiter).join(expressionFieldsList), kb.chars.stop), 1)
-                _ = re.sub(r"(?i)\s*ORDER BY ROWNUM", "", _)
-            output = _oneShotUnionUse(_, False)
-            value = parseUnionPage(output)
-            kb.jsonAggMode = False
-    elif Backend.isDbms(DBMS.MSSQL) and kb.dumpColumns:
-        kb.rowXmlMode = True
-        _ = "(%s FOR XML RAW, BINARY BASE64)" % expression
-        output = _oneShotUnionUse(_, False)
-        value = parseUnionPage(output)
-        kb.rowXmlMode = False
-
     if expressionFieldsList and len(expressionFieldsList) > 1 and "ORDER BY" in expression.upper():
         # Removed ORDER BY clause because UNION does not play well with it
         expression = re.sub(r"(?i)\s*ORDER BY\s+[\w,]+", "", expression)
         debugMsg = "stripping ORDER BY clause from statement because "
         debugMsg += "it does not play well with UNION query SQL injection"
         singleTimeDebugMessage(debugMsg)
+
+    if Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.ORACLE, DBMS.PGSQL, DBMS.MSSQL) and expressionFields:
+        match = re.search(r"SELECT\s*(.+?)\bFROM", expression, re.I)
+        if match and not (Backend.isDbms(DBMS.ORACLE) and FROM_DUMMY_TABLE[DBMS.ORACLE] in expression):
+            kb.jsonAggMode = True
+            if Backend.isDbms(DBMS.MYSQL):
+                query = expression.replace(expressionFields, "CONCAT('%s',JSON_ARRAYAGG(CONCAT_WS('%s',%s)),'%s')" % (kb.chars.start, kb.chars.delimiter, expressionFields, kb.chars.stop), 1)
+            elif Backend.isDbms(DBMS.ORACLE):
+                query = expression.replace(expressionFields, "'%s'||JSON_ARRAYAGG(%s)||'%s'" % (kb.chars.start, ("||'%s'||" % kb.chars.delimiter).join(expressionFieldsList), kb.chars.stop), 1)
+            elif Backend.isDbms(DBMS.PGSQL):    # Note: ARRAY_AGG does CSV alike output, thus enclosing start/end inside each item
+                query = expression.replace(expressionFields, "ARRAY_AGG('%s'||%s||'%s')::text" % (kb.chars.start, ("||'%s'||" % kb.chars.delimiter).join("COALESCE(%s::text,' ')" % field for field in expressionFieldsList), kb.chars.stop), 1)
+            elif Backend.isDbms(DBMS.MSSQL):
+                query = "'%s'+(%s FOR JSON AUTO, INCLUDE_NULL_VALUES)+'%s'" % (kb.chars.start, expression, kb.chars.stop)
+            output = _oneShotUnionUse(query, False)
+            value = parseUnionPage(output)
+            kb.jsonAggMode = False
 
     # We have to check if the SQL query might return multiple entries
     # if the technique is partial UNION query and in such case forge the
