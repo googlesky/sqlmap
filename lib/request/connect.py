@@ -1125,7 +1125,7 @@ class Connect(object):
                         match = re.search(r"(?P<name>%s)[\"']:[\"'](?P<value>[^\"']+)" % conf.csrfToken, page or "", re.I)
 
                         if not match:
-                            match = re.search(r"\b(?P<name>%s)\s*[:=]\s*(?P<value>\w+)" % conf.csrfToken, str(headers), re.I)
+                            match = re.search(r"\b(?P<name>%s)\s*[:=]\s*(?P<value>\w+)" % conf.csrfToken, getUnicode(headers), re.I)
 
                             if not match:
                                 match = re.search(r"\b(?P<name>%s)\s*=\s*['\"]?(?P<value>[^;'\"]+)" % conf.csrfToken, page or "", re.I)
@@ -1278,7 +1278,7 @@ class Connect(object):
 
             for name, value in variables.items():
                 if name != "__builtins__" and originals.get(name, "") != value:
-                    if isinstance(value, (int, float, six.string_types)):
+                    if isinstance(value, (int, float, six.string_types, six.binary_type)):
                         found = False
                         value = getUnicode(value, UNICODE_ENCODING)
 
