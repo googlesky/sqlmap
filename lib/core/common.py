@@ -12,6 +12,7 @@ import codecs
 import collections
 import contextlib
 import copy
+import distutils.version
 import functools
 import getpass
 import hashlib
@@ -586,7 +587,15 @@ class Backend(object):
 
     @staticmethod
     def isVersionGreaterOrEqualThan(version):
-        return Backend.getVersion() is not None and str(Backend.getVersion()) >= str(version)
+        retVal = False
+
+        if Backend.getVersion() is not None and version is not None:
+            try:
+                retVal = distutils.version.LooseVersion(Backend.getVersion()) >= distutils.version.LooseVersion(version)
+            except:
+                retVal = str(Backend.getVersion()) >= str(version)
+
+        return retVal
 
     @staticmethod
     def isOs(os):
