@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2020 sqlmap developers (http://sqlmap.org/)
+Copyright (c) 2006-2021 sqlmap developers (http://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -430,7 +430,11 @@ def _setStdinPipeTargets():
                 return self.next()
 
             def next(self):
-                line = next(conf.stdinPipe)
+                try:
+                    line = next(conf.stdinPipe)
+                except (IOError, OSError):
+                    line = None
+
                 if line:
                     match = re.search(r"\b(https?://[^\s'\"]+|[\w.]+\.\w{2,3}[/\w+]*\?[^\s'\"]+)", line, re.I)
                     if match:

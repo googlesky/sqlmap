@@ -3,5 +3,4 @@
 # Copyright (c) 2006-2021 sqlmap developers (http://sqlmap.org/)
 # See the file 'LICENSE' for copying permission
 
-# Removes trailing spaces from blank lines inside project files
-find . -type f -iname '*.py' -exec sed -i 's/^[ \t]*$//' {} \;
+find . -wholename "./thirdparty" -prune -o -type f -iname "*.py" -exec pylint --rcfile=./.pylintrc '{}' \;

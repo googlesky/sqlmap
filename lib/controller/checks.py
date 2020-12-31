@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2020 sqlmap developers (http://sqlmap.org/)
+Copyright (c) 2006-2021 sqlmap developers (http://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -1137,7 +1137,8 @@ def heuristicCheckSqlInjection(place, parameter):
 
     paramType = conf.method if conf.method not in (None, HTTPMETHOD.GET, HTTPMETHOD.POST) else place
 
-    if value.lower() in (page or "").lower():
+    # Reference: https://bugs.python.org/issue18183
+    if value.upper() in (page or "").upper():
         infoMsg = "heuristic (XSS) test shows that %sparameter '%s' might be vulnerable to cross-site scripting (XSS) attacks" % ("%s " % paramType if paramType != parameter else "", parameter)
         logger.info(infoMsg)
 
