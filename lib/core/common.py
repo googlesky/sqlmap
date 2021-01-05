@@ -1270,6 +1270,8 @@ def sanitizeStr(value):
 
     >>> sanitizeStr('foo\\n\\rbar') == 'foo bar'
     True
+    >>> sanitizeStr(None) == 'None'
+    True
     """
 
     return getUnicode(value).replace("\n", " ").replace("\r", "")
