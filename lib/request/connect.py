@@ -6,6 +6,7 @@ See the file 'LICENSE' for copying permission
 """
 
 import binascii
+import inspect
 import logging
 import os
 import random
@@ -13,6 +14,7 @@ import re
 import socket
 import string
 import struct
+import sys
 import time
 import traceback
 
@@ -145,6 +147,10 @@ class Connect(object):
 
     @staticmethod
     def _getPageProxy(**kwargs):
+        if (len(inspect.stack()) > sys.getrecursionlimit() // 2):   # Note: https://github.com/sqlmapproject/sqlmap/issues/4525
+            warnMsg = "unable to connect to the target URL"
+            raise SqlmapConnectionException(warnMsg)
+
         try:
             return Connect.getPage(**kwargs)
         except RuntimeError:
@@ -182,16 +188,23 @@ class Connect(object):
                 warnMsg += "you could successfully use "
                 warnMsg += "switch '--tor' "
                 if IS_WIN:
-                    warnMsg += "(e.g. 'https://www.torproject.org/download/download.html.en')"
+                    warnMsg += "(e.g. 'https://www.torproject.org/download/')"
                 else:
                     warnMsg += "(e.g. 'https://help.ubuntu.com/community/Tor')"
             else:
                 warnMsg = "if the problem persists please check that the provided "
-                warnMsg += "target URL is reachable. In case that it is, "
-                warnMsg += "you can try to rerun with "
+                warnMsg += "target URL is reachable"
+
+                items = []
                 if not conf.randomAgent:
-                    warnMsg += "switch '--random-agent' and/or "
-                warnMsg += "proxy switches ('--ignore-proxy', '--proxy',...)"
+                    items.append("switch '--random-agent'")
+                if not any((conf.proxy, conf.proxyFile, conf.tor)):
+                    items.append("proxy switches ('--proxy', '--proxy-file'...)")
+                if items:
+                    warnMsg += ". In case that it is, "
+                    warnMsg += "you can try to rerun with "
+                    warnMsg += " and/or ".join(items)
+
             singleTimeWarnMessage(warnMsg)
 
         elif conf.threads > 1:
