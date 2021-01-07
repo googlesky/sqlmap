@@ -18,7 +18,7 @@ from lib.core.enums import OS
 from thirdparty.six import unichr as _unichr
 
 # sqlmap version (<major>.<minor>.<month>.<monthly commit>)
-VERSION = "1.5.1.12"
+VERSION = "1.5.1.17"
 TYPE = "dev" if VERSION.count('.') > 2 and VERSION.split('.')[-1] != '0' else "stable"
 TYPE_COLORS = {"dev": 33, "stable": 90, "pip": 34}
 VERSION_STRING = "sqlmap/%s#%s" % ('.'.join(VERSION.split('.')[:-1]) if VERSION.count('.') > 2 and VERSION.split('.')[-1] == '0' else VERSION, TYPE)
@@ -397,14 +397,14 @@ FILE_PATH_REGEXES = (r"<b>(?P<result>[^<>]+?)</b> on line \d+", r"\bin (?P<resul
 # Regular expressions used for parsing error messages (--parse-errors)
 ERROR_PARSING_REGEXES = (
     r"\[Microsoft\]\[ODBC SQL Server Driver\]\[SQL Server\](?P<result>[^<]+)",
-    r"<b>[^<]*(fatal|error|warning|exception)[^<]*</b>:?\s*(?P<result>[^<]+)",
-    r"(?m)^\s*(fatal|error|warning|exception):?\s*(?P<result>[^\n]+?)$",
+    r"<b>[^<]{0,100}(fatal|error|warning|exception)[^<]*</b>:?\s*(?P<result>[^<]+)",
+    r"(?m)^\s{0,100}(fatal|error|warning|exception):?\s*(?P<result>[^\n]+?)$",
     r"(sql|dbc)[^>'\"]{0,32}(fatal|error|warning|exception)(</b>)?:\s*(?P<result>[^<>]+)",
-    r"(?P<result>[^\n>]*SQL Syntax[^\n<]+)",
+    r"(?P<result>[^\n>]{0,100}SQL Syntax[^\n<]+)",
     r"(?s)<li>Error Type:<br>(?P<result>.+?)</li>",
     r"CDbCommand (?P<result>[^<>\n]*SQL[^<>\n]+)",
     r"error '[0-9a-f]{8}'((<[^>]+>)|\s)+(?P<result>[^<>]+)",
-    r"\[[^\n\]]+(ODBC|JDBC)[^\n\]]+\](\[[^\]]+\])?(?P<result>[^\n]+(in query expression|\(SQL| at /[^ ]+pdo)[^\n<]+)",
+    r"\[[^\n\]]{1,100}(ODBC|JDBC)[^\n\]]+\](\[[^\]]+\])?(?P<result>[^\n]+(in query expression|\(SQL| at /[^ ]+pdo)[^\n<]+)",
     r"(?P<result>query error: SELECT[^<>]+)"
 )
 
@@ -756,6 +756,9 @@ MAX_CONNECTION_TOTAL_SIZE = 100 * 1024 * 1024
 
 # For preventing MemoryError exceptions (caused when using large sequences in difflib.SequenceMatcher)
 MAX_DIFFLIB_SEQUENCE_LENGTH = 10 * 1024 * 1024
+
+# Page size threshold used in heuristic checks (e.g. getHeuristicCharEncoding(), identYwaf, htmlParser, etc.)
+HEURISTIC_PAGE_SIZE_THRESHOLD = 64 * 1024
 
 # Maximum (multi-threaded) length of entry in bisection algorithm
 MAX_BISECTION_LENGTH = 50 * 1024 * 1024
