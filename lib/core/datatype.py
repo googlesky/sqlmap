@@ -5,11 +5,11 @@ Copyright (c) 2006-2021 sqlmap developers (http://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
-import collections
 import copy
 import types
 
 from thirdparty.odict import OrderedDict
+from thirdparty.six.moves import collections_abc as _collections
 
 class AttribDict(dict):
     """
@@ -159,7 +159,7 @@ class LRUDict(object):
         return self.cache.keys()
 
 # Reference: https://code.activestate.com/recipes/576694/
-class OrderedSet(collections.MutableSet):
+class OrderedSet(_collections.MutableSet):
     """
     This class defines the set with ordered (as added) items
 

@@ -39,14 +39,14 @@ def vulnTest():
 
     TESTS = (
         ("-h", ("to see full list of options run with '-hh'",)),
-        ("--dependencies", ("sqlmap requires", "third-party library")),
+        ("--dependencies --deprecations", ("sqlmap requires", "third-party library", "~DeprecationWarning:")),
         ("-u <url> --flush-session --wizard", ("Please choose:", "back-end DBMS: SQLite", "current user is DBA: True", "banner: '3.")),
         (u"-c <config> --flush-session --roles --statements --hostname --privileges --sql-query=\"SELECT '\u0161u\u0107uraj'\" --technique=U", (u": '\u0161u\u0107uraj'", "on SQLite it is not possible")),
         (u"-u <url> --flush-session --sql-query=\"SELECT '\u0161u\u0107uraj'\" --technique=B --no-escape --string=luther --unstable", (u": '\u0161u\u0107uraj'",)),
         ("--dummy", ("all tested parameters do not appear to be injectable", "does not seem to be injectable", "there is not at least one", "~might be injectable")),
         ("-u '<url>&id2=1' -p id2 -v 5 --flush-session --level=5 --test-filter='AND boolean-based blind - WHERE or HAVING clause (MySQL comment)'", ("~1AND",)),
         ("--list-tampers", ("between", "MySQL", "xforwardedfor")),
-        ("-r <request> --flush-session -v 5 --test-skip='heavy' --save=<config>", ("CloudFlare", "possible DBMS: 'SQLite'", "User-agent: foobar", "~Type: time-based blind", "saved command line options to the configuration file")),
+        ("-r <request> --flush-session -v 5 --test-skip='heavy' --save=<config>", ("CloudFlare", "web application technology: Express", "possible DBMS: 'SQLite'", "User-agent: foobar", "~Type: time-based blind", "saved command line options to the configuration file")),
         ("-c <config>", ("CloudFlare", "possible DBMS: 'SQLite'", "User-agent: foobar", "~Type: time-based blind")),
         ("<piped> -r <request> -l <log> --flush-session --banner --technique=B", ("banner: '3.", "STDIN")),
         ("-l <log> --flush-session --keep-alive --skip-waf -v 5 --technique=U --union-from=users --banner --parse-errors", ("banner: '3.", "ORDER BY term out of range", "~xp_cmdshell", "Connection: keep-alive")),
