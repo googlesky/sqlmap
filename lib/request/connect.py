@@ -126,6 +126,7 @@ from lib.core.settings import UNICODE_ENCODING
 from lib.core.settings import URI_HTTP_HEADER
 from lib.core.settings import WARN_TIME_STDEV
 from lib.core.settings import WEBSOCKET_INITIAL_TIMEOUT
+from lib.core.settings import YUGE_FACTOR
 from lib.request.basic import decodePage
 from lib.request.basic import forgeHeaders
 from lib.request.basic import processResponse
@@ -251,6 +252,9 @@ class Connect(object):
                         warnMsg = "too large response detected. Automatically trimming it"
                         singleTimeWarnMessage(warnMsg)
                         break
+
+        if conf.yuge:
+            retVal = YUGE_FACTOR * retVal
 
         return retVal
 
