@@ -42,7 +42,7 @@ def vulnTest():
         ("--dependencies --deprecations", ("sqlmap requires", "third-party library", "~DeprecationWarning:")),
         ("-u <url> --data='reflect=1' --flush-session --wizard --disable-coloring", ("Please choose:", "back-end DBMS: SQLite", "current user is DBA: True", "banner: '3.")),
         ("-u <url> --data='code=1' --code=200 --technique=B --banner --no-cast --flush-session", ("back-end DBMS: SQLite", "banner: '3.", "~COALESCE(CAST(")),
-        (u"-c <config> --flush-session --output-dir=\"<tmdir>\"--smart --roles --statements --hostname --privileges --sql-query=\"SELECT '\u0161u\u0107uraj'\" --technique=U", (u": '\u0161u\u0107uraj'", "on SQLite it is not possible", "as the output directory")),
+        (u"-c <config> --flush-session --output-dir=\"<tmpdir>\" --smart --roles --statements --hostname --privileges --sql-query=\"SELECT '\u0161u\u0107uraj'\" --technique=U", (u": '\u0161u\u0107uraj'", "on SQLite it is not possible", "as the output directory")),
         (u"-u <url> --flush-session --sql-query=\"SELECT '\u0161u\u0107uraj'\" --technique=B --no-escape --string=luther --unstable", (u": '\u0161u\u0107uraj'",)),
         ("-m <multiple> --flush-session --technique=B --banner", ("URL 3:", "back-end DBMS: SQLite", "banner: '3.")),
         ("--dummy", ("all tested parameters do not appear to be injectable", "does not seem to be injectable", "there is not at least one", "~might be injectable")),
@@ -61,8 +61,8 @@ def vulnTest():
         ("-u <url> --flush-session --encoding=ascii --forms --crawl=2 --threads=2 --banner", ("total of 2 targets", "might be injectable", "Type: UNION query", "banner: '3.")),
         ("-u <base> --flush-session --data='{\"id\": 1}' --banner", ("might be injectable", "3 columns", "Payload: {\"id\"", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", "banner: '3.")),
         ("-u <base> --flush-session -H 'Foo: Bar' -H 'Sna: Fu' --data='<root><param name=\"id\" value=\"1*\"/></root>' --union-char=1 --mobile --answers='smartphone=3' --banner --smart -v 5", ("might be injectable", "Payload: <root><param name=\"id\" value=\"1", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", "banner: '3.", "Nexus", "Sna: Fu", "Foo: Bar")),
-        ("-u <base> --flush-session --method=PUT --data='a=1;id=1;b=2' --param-del=';' --skip-static --har=<tmp> --dump -T users --start=1 --stop=2", ("might be injectable", "Parameter: id (PUT)", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", "2 entries")),
-        ("-u <url> --flush-session -H 'id: 1*' --tables -t <tmp>", ("might be injectable", "Parameter: id #1* ((custom) HEADER)", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", " users ")),
+        ("-u <base> --flush-session --method=PUT --data='a=1;id=1;b=2' --param-del=';' --skip-static --har=<tmpfile> --dump -T users --start=1 --stop=2", ("might be injectable", "Parameter: id (PUT)", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", "2 entries")),
+        ("-u <url> --flush-session -H 'id: 1*' --tables -t <tmpfile>", ("might be injectable", "Parameter: id #1* ((custom) HEADER)", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", " users ")),
         ("-u <url> --flush-session --banner --invalid-logical --technique=B --predict-output --test-filter='OR boolean' --tamper=space2dash", ("banner: '3.", " LIKE ")),
         ("-u <url> --flush-session --cookie=\"PHPSESSID=d41d8cd98f00b204e9800998ecf8427e; id=1*; id2=2\" --tables --union-cols=3", ("might be injectable", "Cookie #1* ((custom) HEADER)", "Type: boolean-based blind", "Type: time-based blind", "Type: UNION query", " users ")),
         ("-u <url> --flush-session --null-connection --technique=B --tamper=between,randomcase --banner --count -T users", ("NULL connection is supported with HEAD method", "banner: '3.", "users | 5")),
@@ -145,10 +145,10 @@ def vulnTest():
 
         cmd = "%s \"%s\" %s --batch --non-interactive --debug" % (sys.executable, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.py")), options)
 
-        if "<tmp>" in cmd:
+        if "<tmpfile>" in cmd:
             handle, tmp = tempfile.mkstemp()
             os.close(handle)
-            cmd = cmd.replace("<tmp>", tmp)
+            cmd = cmd.replace("<tmpfile>", tmp)
 
         if "<piped>" in cmd:
             cmd = re.sub(r"<piped>\s*", "", cmd)
@@ -168,107 +168,6 @@ def vulnTest():
         logger.info("vuln test final result: PASSED")
     else:
         logger.error("vuln test final result: FAILED")
-
-    return retVal
-
-def bedTest():
-    """
-    Runs the testing against 'testbed'
-    """
-
-    TESTS = (
-        # MaxDB
-        ("-u 'http://testbed/maxdb/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("Kernel____7.9.10___Build_003-123-265-343", "Database: DBADMIN", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'SAP MaxDB'", "the back-end DBMS is SAP MaxDB", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/maxdb/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("Kernel____7.9.10___Build_003-123-265-343", "Database: DBADMIN", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is SAP MaxDB", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/maxdb/get_int.php?id=1' --flush-session --technique=U --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Kernel____7.9.10___Build_003-123-265-343", "current database (equivalent to owner on SAP MaxDB): 'SYS'", "current user: 'DBADMIN'", "[1 column]", "| SURNAME | VARCHAR |")),
-
-        # Informix
-        ("-u 'http://testbed/informix/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("retrieved: 47", "IBM Informix Dynamic Server Version 14.10.FC2DE", "Database: testdb", "Table: users", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "back-end DBMS could be 'Informix'", "the back-end DBMS is Informix", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/informix/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("IBM Informix Dynamic Server Version 14.10.FC2DE", "current database: 'testdb'", "current user: 'testuser'", "[1 column]", "| surname | varchar |")),
-
-        # Altibase
-        ("-u 'http://testbed/altibase/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-unknown-linux-gnu", "Database: SYS", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "back-end DBMS could be 'Altibase'", "the back-end DBMS is Altibase", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/altibase/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-unknown-linux-gnu", "Database: SYS", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is Altibase", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/altibase/get_int.php?id=1' --flush-session --technique=U --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("x86_64-unknown-linux-gnu", "current database (equivalent to owner on Altibase): 'SYS'", "current user: 'SYS'", "[1 column]", "| SURNAME | VARCHAR |")),
-
-        # CockroachDB
-        ("-u 'http://testbed/cockroachdb/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-unknown-linux-gnu", "CockroachDB fork", "Database: public", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "back-end DBMS could be 'PostgreSQL'", "the back-end DBMS is PostgreSQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/cockroachdb/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-unknown-linux-gnu", "CockroachDB fork", "Database: public", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is PostgreSQL", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/cockroachdb/get_int.php?id=1' --flush-session --technique=E --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-unknown-linux-gnu", "CockroachDB fork", "Database: public", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: PostgreSQL AND error-based", "the back-end DBMS is PostgreSQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/cockroachdb/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: PostgreSQL AND error-based", "Title: PostgreSQL > 8.1 stacked queries", "Title: PostgreSQL > 8.1 AND time-based blind", "Title: Generic UNION query (NULL) - 3 columns", "x86_64-unknown-linux-gnu", "current database (equivalent to schema on PostgreSQL): 'public'", "current user: 'root'", "[1 column]", "| surname | varchar |")),
-
-        # CrateDB
-        ("-u 'http://testbed/cratedb/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("4.0.10", "Database: doc", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "back-end DBMS could be 'CrateDB'", "the back-end DBMS is CrateDB", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/cratedb/get_int.php?id=1' --flush-session --technique=B --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("4.0.10", "current database (equivalent to schema on CrateDB): 'doc'", "current user: 'crate'", "[1 column]", "| surname |")),
-
-        # Drizzle
-        ("-u 'http://testbed/drizzle/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("7.1.36-stable", "Drizzle fork", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'MySQL'", "the back-end DBMS is MySQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/drizzle/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("7.1.36-stable", "Drizzle fork", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is MySQL", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/drizzle/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: MySQL >= 5.0.12 AND time-based blind", "Title: Generic UNION query (NULL) - 3 columns", "7.1.36-stable", "current database: 'testdb'", "current user: 'root'", "[1 column]", "| surname | VARCHAR |")),
-
-        # Firebird
-        ("-u 'http://testbed/firebird/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump --banner --sql-query=\"SELECT 'foobar'\"", ("banner: '2.5", "Table: USERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "possible DBMS: 'Firebird'", "the back-end DBMS is Firebird", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/firebird/get_int.php?id=1' --flush-session --technique=U --is-dba --dump --banner --sql-query=\"SELECT 'foobar'\"", ("banner: '2.5", "Table: USERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is Firebird", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/firebird/get_int.php?id=1' --flush-session --technique=U --hex --banner --current-user --search -C surname --answers='dump=n'", ("banner: '2.5", "current user: 'SYSDBA'", "[1 column]", "| SURNAME | VARCHAR |")),
-
-        # H2
-        ("-u 'http://testbed/h2/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("1.4.192", "Database: PUBLIC", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "back-end DBMS could be 'H2'", "the back-end DBMS is H2", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/h2/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("1.4.192", "Database: PUBLIC", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is H2", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/h2/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: Generic inline queries", "Title: Generic UNION query (NULL) - 3 columns", "1.4.192", "current database (equivalent to schema on H2): 'PUBLIC'", "current user: 'SA'", "[1 column]", "| SURNAME | VARCHAR |")),
-
-        # HSQLDB
-        ("-u 'http://testbed/hsqldb/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("2.3.4", "Database: PUBLIC", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'HSQLDB'", "the back-end DBMS is HSQLDB", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/hsqldb/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("2.3.4", "Database: PUBLIC", "Table: TESTUSERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is HSQLDB", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/hsqldb/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: HSQLDB > 2.0 AND time-based blind (heavy query)", "Title: Generic UNION query (NULL) - 3 columns", "2.3.4", "current database (equivalent to schema on HSQLDB): 'PUBLIC'", "current user: 'SA'", "[1 column]", "| SURNAME | VARCHAR |")),
-
-        # IBM DB2
-        ("-u 'http://testbed/db2/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("banner: 'DB2 v", "Database: DB2INST1", "Table: USERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'IBM DB2'", "the back-end DBMS is IBM DB2", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/db2/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("banner: 'DB2 v", "Database: DB2INST1", "Table: USERS", "5 entries", "ID", "NAME", "SURNAME", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is IBM DB2", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/db2/get_int.php?id=1' --flush-session --technique=U --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("banner: 'DB2 v", "current database (equivalent to owner on IBM DB2): 'DB2INST1'", "current user: 'DB2INST1'", "[1 column]", "| SURNAME | VARCHAR(1000) |")),
-
-        # MariaDB
-        ("-u 'http://testbed/mariadb/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("10.4.12-MariaDB-1:10.4.12+maria~bionic", "MariaDB fork", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'MySQL'", "the back-end DBMS is MySQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mariadb/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("10.4.12-MariaDB-1:10.4.12+maria~bionic", "MariaDB fork", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is MySQL", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mariadb/get_int.php?id=1' --flush-session --technique=E --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("10.4.12-MariaDB-1:10.4.12+maria~bionic", "MariaDB fork", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: MySQL >= 5.0 AND error-based", "the back-end DBMS is MySQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mariadb/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: MySQL >= 5.0 AND error-based", "Title: MySQL >= 5.0.12 AND time-based blind", "Title: Generic UNION query (NULL) - 3 columns", "10.4.12-MariaDB-1:10.4.12+maria~bionic", "current database: 'testdb'", "current user: 'root@%'", "[1 column]", "| surname | varchar(1000) |")),
-
-        # MySQL
-        ("-u 'http://testbed/mysql/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("8.0.19", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'MySQL'", "the back-end DBMS is MySQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mysql/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("8.0.19", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is MySQL", "appears to have 3 columns", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mysql/get_int.php?id=1' --flush-session --technique=E --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("8.0.19", "Database: testdb", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: MySQL >= 5.0 AND error-based", "the back-end DBMS is MySQL", "current user is DBA: True", ": 'foobar'")),
-        ("-u 'http://testbed/mysql/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: MySQL >= 5.1 AND error-based", "Title: MySQL >= 5.0.12 AND time-based blind", "Title: Generic UNION query (NULL) - 3 columns", "8.0.19", "current database: 'testdb'", "current user: 'root@%'", "[1 column]", "| surname | varchar(1000) |")),
-
-        # PostgreSQL
-        ("-u 'http://testbed/postgresql/get_int.php?id=1' --flush-session --technique=B --is-dba --threads=4 --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-pc-linux-gnu", "Database: public", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Payload: id=1 AND ", "it looks like the back-end DBMS is 'PostgreSQL'", "the back-end DBMS is PostgreSQL", "current user is DBA: False", ": 'foobar'")),
-        ("-u 'http://testbed/postgresql/get_int.php?id=1' --flush-session --technique=U --is-dba --dump -D CD --banner --sql-query=\"SELECT 'foobar'\"", ("x86_64-pc-linux-gnu", "Database: public", "Table: testusers", "5 entries", "id", "name", "surname", "luther", "blisset", "NULL", "Title: Generic UNION query (NULL) - 3 columns", "the back-end DBMS is PostgreSQL", "appears to have 3 columns", "current user is DBA: False", ": 'foobar'")),
-        ("-u 'http://testbed/postgresql/get_int.php?id=1' --flush-session --hex --banner --current-user --current-db --search -C surname --answers='dump=n'", ("Title: AND boolean-based blind", "Title: PostgreSQL AND error-based", "Title: PostgreSQL > 8.1 stacked queries", "Title: PostgreSQL > 8.1 AND time-based blind", "Title: Generic UNION query (NULL) - 3 columns", "x86_64-pc-linux-gnu", "current database (equivalent to schema on PostgreSQL): 'public'", "current user: 'testuser'", "[1 column]", "| surname | varchar |")),
-    )
-
-    retVal = True
-    count = 0
-
-    for options, checks in TESTS:
-        status = '%d/%d (%d%%) ' % (count, len(TESTS), round(100.0 * count / len(TESTS)))
-        dataToStdout("\r[%s] [INFO] complete: %s" % (time.strftime("%X"), status))
-
-        cmd = "%s %s %s --batch" % (sys.executable, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.py")), options)
-        output = shellExec(cmd)
-
-        if not all((check in output if not check.startswith('~') else check[1:] not in output) for check in checks):
-            for check in checks:
-                if check not in output:
-                    print(cmd, check)
-            dataToStdout("---\n\n$ %s\n" % cmd)
-            dataToStdout("%s---\n" % output, coloring=False)
-            retVal = False
-
-        count += 1
-
-    clearConsoleLine()
-    if retVal:
-        logger.info("bed test final result: PASSED")
-    else:
-        logger.error("best test final result: FAILED")
 
     return retVal
 
