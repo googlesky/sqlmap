@@ -193,7 +193,7 @@ def cmdLineParser(argv=None):
             help="Extra headers (e.g. \"Accept-Language: fr\\nETag: 123\")")
 
         request.add_argument("--auth-type", dest="authType",
-            help="HTTP authentication type (Basic, Digest, NTLM or PKI)")
+            help="HTTP authentication type (Basic, Digest, Bearer, ...)")
 
         request.add_argument("--auth-cred", dest="authCred",
             help="HTTP authentication credentials (name:password)")
@@ -704,7 +704,7 @@ def cmdLineParser(argv=None):
             help="Regexp for filtering targets")
 
         general.add_argument("--skip-heuristics", dest="skipHeuristics", action="store_true",
-            help="Skip heuristic detection of SQLi/XSS/FI vulnerabilities")
+            help="Skip heuristic detection of vulnerabilities")
 
         general.add_argument("--skip-waf", dest="skipWaf", action="store_true",
             help="Skip heuristic detection of WAF/IPS protection")
@@ -731,7 +731,7 @@ def cmdLineParser(argv=None):
             help="Run host OS command(s) when SQL injection is found")
 
         miscellaneous.add_argument("--beep", dest="beep", action="store_true",
-            help="Beep on question and/or when SQLi/XSS/FI is found")
+            help="Beep on question and/or when vulnerability is found")
 
         miscellaneous.add_argument("--dependencies", dest="dependencies", action="store_true",
             help="Check for missing (optional) sqlmap dependencies")
@@ -976,6 +976,8 @@ def cmdLineParser(argv=None):
                 argv[i] = ""
             elif argv[i].startswith("--data-raw"):
                 argv[i] = argv[i].replace("--data-raw", "--data", 1)
+            elif argv[i].startswith("--auth-creds"):
+                argv[i] = argv[i].replace("--auth-creds", "--auth-cred", 1)
             elif argv[i].startswith("--drop-cookie"):
                 argv[i] = argv[i].replace("--drop-cookie", "--drop-set-cookie", 1)
             elif any(argv[i].startswith(_) for _ in ("--tamper", "--ignore-code", "--skip")):
