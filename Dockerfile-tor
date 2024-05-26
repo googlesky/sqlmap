@@ -1,0 +1,25 @@
+FROM python:3-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+ARG WEBSOCKET_CLIENT=websocket-client
+ARG BUILDTIME
+ARG VERSION
+
+WORKDIR /sqlmap-dev
+COPY . /sqlmap-dev
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tor ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i 's/^#\?CookieAuthentication.*/CookieAuthentication 0/' /etc/tor/torrc \
+    && sed -i 's/^#\?CookieAuthFileGroupReadable.*/CookieAuthFileGroupReadable 0/' /etc/tor/torrc \
+    && sed -i 's/^#\?RunAsDaemon.*/RunAsDaemon 0/' /etc/tor/torrc \
+    && python -m pip install --upgrade pip \
+    && pip install --no-cache-dir "$WEBSOCKET_CLIENT" \
+    && chmod +x /sqlmap-dev/entrypoint.sh
+
+ENTRYPOINT ["/sqlmap-dev/entrypoint.sh"]
+CMD ["-h"]
