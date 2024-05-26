@@ -1,0 +1,13 @@
+FROM python:3
+ARG DEBIAN_FRONTEND=noninteractive
+COPY . /sqlmap-dev
+RUN apt clean; apt update; apt install -y tor systemd; \
+    # sed -i 's/#SocksPort.*/SocksPort 0.0.0.0:9050/g' /etc/tor/torrc; \
+    sed -i 's/#CookieAuthentication 1/CookieAuthentication 0/g' /etc/tor/torrc; \
+    sed -i 's/#CookieAuthFileGroupReadable 1/CookieAuthFileGroupReadable 0/g' /etc/tor/torrc; \
+    sed -i 's/#RunAsDaemon 1/RunAsDaemon 1/g' /etc/tor/torrc; \
+    /etc/init.d/tor restart 
+
+WORKDIR /sqlmap-dev
+ENTRYPOINT ["bash", "/sqlmap-dev/entrypoint.sh"]
+CMD ["-h"]
