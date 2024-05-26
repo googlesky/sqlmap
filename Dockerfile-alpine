@@ -1,0 +1,5 @@
+FROM python:3-alpine
+COPY . sqlmap-dev
+RUN apk update && apk add tor 
+ENTRYPOINT ["python3","sqlmap-dev/sqlmap.py"]
+CMD ["-h"]
