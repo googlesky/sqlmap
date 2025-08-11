@@ -1,0 +1,7 @@
+FROM python:3-alpine
+COPY . sqlmap-dev
+ARG WEBSOCKET_CLIENT=websocket-client
+RUN apk update && apk add tor && \
+    pip install $WEBSOCKET_CLIENT
+ENTRYPOINT ["python3","sqlmap-dev/sqlmap.py"]
+CMD ["-h"]
