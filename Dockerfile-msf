@@ -1,0 +1,52 @@
+# Use official uv image for the binary (multi-arch)
+FROM ghcr.io/astral-sh/uv:latest AS uv-source
+
+# Build on metasploit base
+FROM metasploitframework/metasploit-framework:latest
+ARG DEBIAN_FRONTEND=noninteractive
+ARG WEBSOCKET_CLIENT=websocket-client==1.8.*
+
+USER root
+SHELL ["/bin/bash", "-c"]
+
+# Install Python and dependencies - try multiple package managers
+RUN if command -v apt-get &>/dev/null; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip tor ca-certificates \
+      && rm -rf /var/lib/apt/lists/*; \
+    elif command -v apk &>/dev/null; then \
+      apk add --no-cache python3 py3-pip tor ca-certificates; \
+    elif command -v dnf &>/dev/null; then \
+      dnf install -y python3 python3-pip tor ca-certificates && dnf clean all; \
+    elif command -v yum &>/dev/null; then \
+      yum install -y python3 python3-pip tor ca-certificates && yum clean all; \
+    else \
+      echo "No supported package manager found" && exit 1; \
+    fi
+
+# Copy uv from official image
+COPY --from=uv-source /uv /usr/local/bin/uv
+COPY --from=uv-source /uvx /usr/local/bin/uvx
+
+# Install websocket-client
+RUN pip3 install --no-cache-dir --break-system-packages $WEBSOCKET_CLIENT 2>/dev/null || \
+    pip3 install --no-cache-dir $WEBSOCKET_CLIENT 2>/dev/null || \
+    pip install --no-cache-dir $WEBSOCKET_CLIENT || true
+
+COPY . /sqlmap-dev
+COPY entrypoint-msf.sh /usr/local/bin/entrypoint-msf.sh
+RUN chmod +x /usr/local/bin/entrypoint-msf.sh
+
+ENV PATH="/usr/local/bin:${PATH}"
+ENV ENABLE_TOR=false \
+    TOR_SOCKS_ADDR=0.0.0.0 \
+    TOR_SOCKS_PORT=9050 \
+    SQLMAP_MSF_PATH= \
+    AUTO_START_MSF_RPC=false \
+    MSF_RPC_USER=msf \
+    MSF_RPC_PASS=msf \
+    MSF_RPC_PORT=55553
+EXPOSE 9050
+WORKDIR /sqlmap-dev
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint-msf.sh"]
+CMD ["-h"]

@@ -1,0 +1,47 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  sync-master:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TARGET_BRANCH: master
+      UPSTREAM_URL: https://github.com/sqlmapproject/sqlmap.git
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream + fetch
+        run: |
+          set -euo pipefail
+          if ! git remote get-url upstream >/dev/null 2>&1; then
+            git remote add upstream "$UPSTREAM_URL"
+          fi
+          git fetch upstream --tags --prune --prune-tags
+
+      - name: Merge upstream
+        run: |
+          set -euo pipefail
+          git merge --no-ff --no-edit -s recursive -X ours "upstream/$TARGET_BRANCH"
+
+      - name: Push branch
+        run: |
+          git push origin "$TARGET_BRANCH"
+
+      - name: Push tags
+        run: |
+          git push origin --tags
