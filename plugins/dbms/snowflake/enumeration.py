@@ -15,9 +15,11 @@ class Enumeration(GenericEnumeration):
         logger.warning(warnMsg)
         return {}
 
-    def getHostname(self):
-        warnMsg = "on Snowflake it is not possible to enumerate the hostname"
+    def getRoles(self, *args, **kwargs):
+        warnMsg = "on Snowflake it is not possible to enumerate the user roles"
         logger.warning(warnMsg)
+
+        return {}
 
     def searchDb(self):
         warnMsg = "on Snowflake it is not possible to search databases"
@@ -27,13 +29,3 @@ class Enumeration(GenericEnumeration):
     def searchColumn(self):
         errMsg = "on Snowflake it is not possible to search columns"
         raise SqlmapUnsupportedFeatureException(errMsg)
-
-    def getPrivileges(self, *args, **kwargs):
-        warnMsg = "on SQLite it is not possible to enumerate the user privileges"
-        logger.warning(warnMsg)
-        return {}
-
-    def getStatements(self):
-        warnMsg = "on Snowflake it is not possible to enumerate the SQL statements"
-        logger.warning(warnMsg)
-        return []
