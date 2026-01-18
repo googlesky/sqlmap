@@ -1411,7 +1411,7 @@ def parseJson(content):
     """
     This function parses POST_HINT.JSON and POST_HINT.JSON_LIKE content
 
-    >>> parseJson("{'id':1}")["id"] == 1
+    >>> parseJson("{'id':1, 'foo':[2,3,4]}")["id"] == 1
     True
     >>> parseJson('{"id":1}')["id"] == 1
     True
@@ -1429,10 +1429,10 @@ def parseJson(content):
         if quote == '"':
             retVal = json.loads(content)
         elif quote == "'":
-            content = content.replace('"', '\\"')
-            content = content.replace("\\'", BOUNDARY_BACKSLASH_MARKER)
-            content = content.replace("'", '"')
-            content = content.replace(BOUNDARY_BACKSLASH_MARKER, "'")
+            def _(match):
+                return '"%s"' % match.group(1).replace('"', '\\"')
+
+            content = re.sub(r"'((?:[^'\\]|\\.)*)'", _, content)
             retVal = json.loads(content)
     except:
         pass
@@ -2065,7 +2065,7 @@ def getCharset(charsetType=None):
 
     # Digits
     elif charsetType == CHARSET_TYPE.DIGITS:
-        asciiTbl.extend((0, 9))
+        asciiTbl.extend(xrange(0, 10))
         asciiTbl.extend(xrange(47, 58))
 
     # Hexadecimal
@@ -2465,7 +2465,7 @@ def getSQLSnippet(dbms, sfile, **variables):
 
     return retVal
 
-def readCachedFileContent(filename, mode="rb"):
+def readCachedFileContent(filename, mode='r'):
     """
     Cached reading of file content (avoiding multiple same file reading)
 
@@ -3609,7 +3609,7 @@ def saveConfig(conf, filename):
 
             config.set(family, option, value)
 
-    with openFile(filename, "wb") as f:
+    with openFile(filename, 'w') as f:
         try:
             config.write(f)
         except IOError as ex:
@@ -3815,6 +3815,7 @@ def openFile(filename, mode='r', encoding=UNICODE_ENCODING, errors="reversible",
     # Reference: https://stackoverflow.com/a/37462452
     if 'b' in mode:
         buffering = 0
+        encoding = None
 
     if filename == STDIN_PIPE_DASH:
         if filename not in kb.cache.content:
@@ -4022,7 +4023,7 @@ def createGithubIssue(errMsg, excMsg):
             logger.info(infoMsg)
 
             try:
-                with openFile(paths.GITHUB_HISTORY, "a+b") as f:
+                with openFile(paths.GITHUB_HISTORY, "a+") as f:
                     f.write("%s\n" % key)
             except:
                 pass
@@ -5103,7 +5104,7 @@ def resetCookieJar(cookieJar):
                 os.close(handle)
 
                 # Reference: http://www.hashbangcode.com/blog/netscape-http-cooke-file-parser-php-584.html
-                with openFile(filename, "w+b") as f:
+                with openFile(filename, "w+") as f:
                     f.write("%s\n" % NETSCAPE_FORMAT_HEADER_COOKIES)
                     for line in lines:
                         _ = line.split("\t")
