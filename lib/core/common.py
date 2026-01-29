@@ -1477,10 +1477,18 @@ def cleanQuery(query):
     """
 
     retVal = query
+    queryLower = query.lower()
 
     for sqlStatements in SQL_STATEMENTS.values():
         for sqlStatement in sqlStatements:
             candidate = sqlStatement.replace("(", "").replace(")", "").strip()
+
+            # OPTIMIZATION: Skip expensive regex compilation/search if the keyword
+            # isn't even present in the string. This makes the function O(K) instead of O(N*K)
+            # for the expensive regex part (where K is num keywords).
+            if not candidate or candidate.lower() not in queryLower:
+                continue
+
             queryMatch = re.search(r"(?i)\b(%s)\b" % candidate, query)
 
             if queryMatch and "sys_exec" not in query:
@@ -2923,22 +2931,15 @@ def findMultipartPostBoundary(post):
     """
 
     retVal = None
-
-    done = set()
-    candidates = []
+    counts = {}
 
     for match in re.finditer(r"(?m)^--(.+?)(--)?$", post or ""):
-        _ = match.group(1).strip().strip('-')
+        boundary = match.group(1).strip().strip('-')
+        counts[boundary] = counts.get(boundary, 0) + 1
 
-        if _ in done:
-            continue
-        else:
-            candidates.append((post.count(_), _))
-            done.add(_)
-
-    if candidates:
-        candidates.sort(key=lambda _: _[0], reverse=True)
-        retVal = candidates[0][1]
+    if counts:
+        sorted_boundaries = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        retVal = sorted_boundaries[0][0]
 
     return retVal
 
@@ -4519,34 +4520,32 @@ def randomizeParameterValue(value):
 
     retVal = value
 
-    value = re.sub(r"%[0-9a-fA-F]{2}", "", value)
+    retVal = re.sub(r"%[0-9a-fA-F]{2}", "", retVal)
 
-    for match in re.finditer(r"[A-Z]+", value):
+    def _replace_upper(match):
+        original = match.group()
         while True:
-            original = match.group()
-            candidate = randomStr(len(match.group())).upper()
-            if original != candidate:
-                break
+            candidate = randomStr(len(original)).upper()
+            if candidate != original:
+                return candidate
 
-        retVal = retVal.replace(original, candidate)
-
-    for match in re.finditer(r"[a-z]+", value):
+    def _replace_lower(match):
+        original = match.group()
         while True:
-            original = match.group()
-            candidate = randomStr(len(match.group())).lower()
-            if original != candidate:
-                break
+            candidate = randomStr(len(original)).lower()
+            if candidate != original:
+                return candidate
 
-        retVal = retVal.replace(original, candidate)
-
-    for match in re.finditer(r"[0-9]+", value):
+    def _replace_digit(match):
+        original = match.group()
         while True:
-            original = match.group()
-            candidate = str(randomInt(len(match.group())))
-            if original != candidate:
-                break
+            candidate = str(randomInt(len(original)))
+            if candidate != original:
+                return candidate
 
-        retVal = retVal.replace(original, candidate, 1)
+    retVal = re.sub(r"[A-Z]+", _replace_upper, retVal)
+    retVal = re.sub(r"[a-z]+", _replace_lower, retVal)
+    retVal = re.sub(r"[0-9]+", _replace_digit, retVal)
 
     if re.match(r"\A[^@]+@.+\.[a-z]+\Z", value):
         parts = retVal.split('.')
@@ -4812,7 +4811,17 @@ def checkSameHost(*urls):
                 value = "http://%s" % value
             return value
 
-        return all(re.sub(r"(?i)\Awww\.", "", _urllib.parse.urlparse(_(url) or "").netloc.split(':')[0]) == re.sub(r"(?i)\Awww\.", "", _urllib.parse.urlparse(_(urls[0]) or "").netloc.split(':')[0]) for url in urls[1:])
+        first = _urllib.parse.urlparse(_(urls[0]) or "").hostname or ""
+        first = re.sub(r"(?i)\Awww\.", "", first)
+
+        for url in urls[1:]:
+            current = _urllib.parse.urlparse(_(url) or "").hostname or ""
+            current = re.sub(r"(?i)\Awww\.", "", current)
+
+            if current != first:
+                return False
+
+        return True
 
 def getHostHeader(url):
     """
@@ -5167,10 +5176,12 @@ def prioritySortColumns(columns):
     ['id', 'userid', 'name', 'password']
     """
 
-    def _(column):
-        return column and re.search(r"^id|id$", column, re.I) is not None
+    recompile = re.compile(r"^id|id$", re.I)
 
-    return sorted(sorted(columns, key=len), key=functools.cmp_to_key(lambda x, y: -1 if _(x) and not _(y) else 1 if not _(x) and _(y) else 0))
+    return sorted(columns, key=lambda col: (
+        not (col and recompile.search(col)),
+        len(col)
+    ))
 
 def getRequestHeader(request, name):
     """
@@ -5569,6 +5580,7 @@ def removePostHintPrefix(value):
 
     return re.sub(r"\A(%s) " % '|'.join(re.escape(__) for __ in getPublicTypeMembers(POST_HINT, onlyValues=True)), "", value)
 
+
 def chunkSplitPostData(data):
     """
     Convert POST data to chunked transfer-encoded data (Note: splitting done by SQL keywords)
@@ -5579,7 +5591,7 @@ def chunkSplitPostData(data):
     """
 
     length = len(data)
-    retVal = ""
+    retVal = []
     index = 0
 
     while index < length:
@@ -5599,12 +5611,14 @@ def chunkSplitPostData(data):
                 break
 
         index += chunkSize
-        retVal += "%x;%s\r\n" % (chunkSize, salt)
-        retVal += "%s\r\n" % candidate
 
-    retVal += "0\r\n\r\n"
+        # Append to list instead of recreating the string
+        retVal.append("%x;%s\r\n" % (chunkSize, salt))
+        retVal.append("%s\r\n" % candidate)
 
-    return retVal
+    retVal.append("0\r\n\r\n")
+
+    return "".join(retVal)
 
 def checkSums():
     """
@@ -5625,6 +5639,8 @@ def checkSums():
                     continue
                 with open(filepath, "rb") as f:
                     content = f.read()
+                    if b'\0' not in content:
+                        content = content.replace(b"\r\n", b"\n")
                 if not hashlib.sha256(content).hexdigest() == expected:
                     retVal &= False
                     break
