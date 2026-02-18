@@ -176,16 +176,23 @@ def _comparison(page, headers, code, getRatioValue, pageLength):
             else:
                 key = (hash(seq1), hash(seq2))
 
-            seqMatcher.set_seq1(seq1)
-            seqMatcher.set_seq2(seq2)
+            try:
+                seqMatcher.set_seq1(seq1)
+                seqMatcher.set_seq2(seq2)
+            except:
+                seqMatcher.set_seq1(repr(seq1))
+                seqMatcher.set_seq2(repr(seq2))
 
             if key in kb.cache.comparison:
                 ratio = kb.cache.comparison[key]
             else:
                 try:
-                    ratio = seqMatcher.quick_ratio() if not kb.heavilyDynamic else seqMatcher.ratio()
-                except (TypeError, MemoryError):
-                    ratio = seqMatcher.ratio()
+                    try:
+                        ratio = seqMatcher.quick_ratio() if not kb.heavilyDynamic else seqMatcher.ratio()
+                    except (TypeError, MemoryError, SystemError):
+                        ratio = seqMatcher.ratio()
+                except:
+                    ratio = 0.0
 
                 ratio = round(ratio, 3)
 

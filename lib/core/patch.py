@@ -7,6 +7,7 @@ See the file 'LICENSE' for copying permission
 
 import codecs
 import collections
+import difflib
 import inspect
 import logging
 import os
@@ -176,6 +177,14 @@ def dirtyPatches():
 
         et.parse = _safe_parse
         et._patched = True
+
+    try:
+        import builtins
+    except ImportError:
+        import __builtin__ as builtins
+
+    if "enumerate" in difflib.__dict__ and difflib.enumerate is not builtins.enumerate:
+        difflib.enumerate = builtins.enumerate
 
 def resolveCrossReferences():
     """
