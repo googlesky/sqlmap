@@ -144,9 +144,13 @@ class HashDB(object):
         if key:
             hash_ = HashDB.hashKey(key)
             with self._cache_lock:
-                self._write_cache[hash_] = self._read_cache[hash_] = getUnicode(value) if not serialize else serializeObject(value)
-                cache_size = len(self._write_cache)
-                time_since_flush = time.time() - self._last_flush_time
+                try:
+                    self._write_cache[hash_] = self._read_cache[hash_] = getUnicode(value) if not serialize else serializeObject(value)
+                except RecursionError:
+                    pass
+                finally:
+                    cache_size = len(self._write_cache)
+                    time_since_flush = time.time() - self._last_flush_time
 
             if cache_size >= HASHDB_FLUSH_THRESHOLD_ITEMS or time_since_flush >= HASHDB_FLUSH_THRESHOLD_TIME:
                 self.flush()
