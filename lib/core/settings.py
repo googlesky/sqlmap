@@ -20,7 +20,7 @@ from lib.core.enums import OS
 from thirdparty import six
 
 # sqlmap version (<major>.<minor>.<month>.<monthly commit>)
-VERSION = "1.10.2.18"
+VERSION = "1.10.3.2"
 TYPE = "dev" if VERSION.count('.') > 2 and VERSION.split('.')[-1] != '0' else "stable"
 TYPE_COLORS = {"dev": 33, "stable": 90, "pip": 34}
 VERSION_STRING = "sqlmap/%s#%s" % ('.'.join(VERSION.split('.')[:-1]) if VERSION.count('.') > 2 and VERSION.split('.')[-1] == '0' else VERSION, TYPE)
@@ -62,7 +62,7 @@ LOWER_RATIO_BOUND = 0.02
 UPPER_RATIO_BOUND = 0.98
 
 # For filling in case of dumb push updates
-DUMMY_JUNK = "theim1Ga"
+DUMMY_JUNK = "Ye1esara"
 
 # Markers for special cases when parameter values contain html encoded characters
 PARAMETER_AMP_MARKER = "__PARAMETER_AMP__"
@@ -427,7 +427,8 @@ ERROR_PARSING_REGEXES = (
     r"Code: \d+. DB::Exception: (?P<result>[^<>\n]*)",
     r"error '[0-9a-f]{8}'((<[^>]+>)|\s)+(?P<result>[^<>]+)",
     r"\[[^\n\]]{1,100}(ODBC|JDBC)[^\n\]]+\](\[[^\]]+\])?(?P<result>[^\n]+(in query expression|\(SQL| at /[^ ]+pdo)[^\n<]+)",
-    r"(?P<result>query error: SELECT[^<>]+)"
+    r"(?P<result>query error: SELECT[^<>]+)",
+    r"(?P<result>(?:(?:ORA|PLS)-[0-9]{5}:|SQLCODE[ =:]+-?[0-9]+|SQLSTATE[ =:]+[0-9A-Z]{5}|Dynamic SQL Error|DB2 SQL error:|SAP DBTech JDBC:|SQLiteException:|You have an error in your SQL syntax;|Incorrect syntax near |Unclosed quotation mark after the character string|near \"[^\"]+\": syntax error)[^\n<]*)"
 )
 
 # Regular expression used for parsing charset info from meta html headers
