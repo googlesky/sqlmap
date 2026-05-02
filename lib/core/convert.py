@@ -412,6 +412,8 @@ def stdoutEncode(value):
     Returns textual representation of a given value safe for writing to stdout
     >>> stdoutEncode(b"foobar")
     'foobar'
+    >>> stdoutEncode({"url": "http://example.com/foo", "data": "id=1"}) == {"url": "http://example.com/foo", "data": "id=1"}
+    True
     """
 
     if value is None:
@@ -437,7 +439,8 @@ def stdoutEncode(value):
         if isinstance(value, (bytes, bytearray)):
             value = getUnicode(value, encoding)
         elif not isinstance(value, str):
-            value = str(value)
+            # Reference: https://github.com/sqlmapproject/sqlmap/issues/6054
+            return value
 
         try:
             retVal = value.encode(encoding, errors="replace").decode(encoding, errors="replace")
