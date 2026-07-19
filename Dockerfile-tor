@@ -1,0 +1,17 @@
+FROM python:3
+ARG DEBIAN_FRONTEND=noninteractive
+ARG WEBSOCKET_CLIENT=websocket-client==1.8.*
+COPY . /sqlmap-dev
+RUN apt clean; apt update; apt install -y tor systemd curl; \
+    # sed -i 's/#SocksPort.*/SocksPort 0.0.0.0:9050/g' /etc/tor/torrc; \
+    sed -i 's/#CookieAuthentication 1/CookieAuthentication 0/g' /etc/tor/torrc; \
+    sed -i 's/#CookieAuthFileGroupReadable 1/CookieAuthFileGroupReadable 0/g' /etc/tor/torrc; \
+    sed -i 's/#RunAsDaemon 1/RunAsDaemon 1/g' /etc/tor/torrc; \
+    pip install $WEBSOCKET_CLIENT; \
+    curl -LsSf https://astral.sh/uv/install.sh | sh; \
+    /etc/init.d/tor restart 
+
+ENV PATH="/root/.local/bin:${PATH}"
+WORKDIR /sqlmap-dev
+ENTRYPOINT ["bash", "/sqlmap-dev/entrypoint.sh"]
+CMD ["-h"]

@@ -1,0 +1,330 @@
+name: Docker Build & Push
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to Docker Hub'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: docker.io
+  SQLMAP_REPOSITORY: sqlmapproject/sqlmap
+  SQLMAP_REF: master
+  WEBSOCKET_CLIENT: websocket-client==1.8.*
+
+# Serialize publish runs so one cannot leave another partially pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  prepare:
+    name: Prepare build context
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.change.outputs.should-build }}
+      should-push: ${{ steps.check.outputs.should-push }}
+      build-reason: ${{ steps.change.outputs.build-reason }}
+      image-tag-suffix: ${{ steps.tag.outputs.suffix }}
+      upstream-sha: ${{ steps.upstream.outputs.sha }}
+      upstream-short-sha: ${{ steps.upstream.outputs.short-sha }}
+      source-short-sha: ${{ steps.upstream.outputs.source-short-sha }}
+    steps:
+      - name: Resolve SQLMap revision
+        id: upstream
+        run: |
+          set -euo pipefail
+          sha="$(git ls-remote "https://github.com/${SQLMAP_REPOSITORY}.git" \
+            "refs/heads/${SQLMAP_REF}" | awk 'NR == 1 { print $1 }')"
+
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Unable to resolve ${SQLMAP_REPOSITORY}:${SQLMAP_REF}" >&2
+            exit 1
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short-sha=${sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "source-short-sha=${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if should push
+        id: check
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_IMAGES: ${{ inputs.push_images }}
+        run: |
+          set -euo pipefail
+          wants_push=false
+          should_push=false
+
+          case "$EVENT_NAME" in
+            push|schedule)
+              wants_push=true
+              ;;
+            workflow_dispatch)
+              if [[ "$PUSH_IMAGES" == "true" ]]; then
+                wants_push=true
+              fi
+              ;;
+          esac
+
+          if [[ "$wants_push" == "true" ]]; then
+            if [[ -z "$DOCKER_USERNAME" || -z "$DOCKER_TOKEN" ]]; then
+              echo "Docker Hub credentials are required to push images" >&2
+              exit 1
+            fi
+            should_push=true
+          fi
+
+          echo "should-push=$should_push" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx for change detection
+        if: github.event_name == 'schedule' && steps.check.outputs.should-push == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub for change detection
+        if: github.event_name == 'schedule' && steps.check.outputs.should-push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Check for a new SQLMap revision
+        id: change
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHOULD_PUSH: ${{ steps.check.outputs.should-push }}
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+        run: |
+          set -euo pipefail
+          should_build=true
+          build_reason="${EVENT_NAME} requested a build"
+
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            missing_tags=()
+            for suffix in "" "-alpine" "-tor" "-msf"; do
+              tag="upstream-${UPSTREAM_SHA}${suffix}"
+              image="${REGISTRY}/${DOCKER_USERNAME}/sqlmap:${tag}"
+              if ! docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+                missing_tags+=("$tag")
+              fi
+            done
+
+            if (( ${#missing_tags[@]} == 0 )); then
+              should_build=false
+              build_reason="SQLMap ${UPSTREAM_SHA} is already published"
+            else
+              build_reason="missing image tags: ${missing_tags[*]}"
+            fi
+          fi
+
+          echo "should-build=$should_build" >> "$GITHUB_OUTPUT"
+          echo "build-reason=$build_reason" >> "$GITHUB_OUTPUT"
+
+      - name: Generate image tag suffix
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "suffix=-pr${{ github.event.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "suffix=" >> $GITHUB_OUTPUT
+          fi
+
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should-build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: main
+            dockerfile: Dockerfile
+            tag-suffix: ""
+            platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v5,linux/s390x,linux/ppc64le
+          - name: alpine
+            dockerfile: Dockerfile-alpine
+            tag-suffix: -alpine
+            platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7
+          - name: tor
+            dockerfile: Dockerfile-tor
+            tag-suffix: -tor
+            platforms: linux/amd64,linux/arm64
+          - name: msf
+            dockerfile: Dockerfile-msf
+            tag-suffix: -msf
+            platforms: linux/amd64,linux/arm64
+
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout SQLMap repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.SQLMAP_REPOSITORY }}
+          ref: ${{ needs.prepare.outputs.upstream-sha }}
+          path: sqlmap
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/tests/
+          sparse-checkout-cone-mode: false
+
+      - name: Verify required files exist
+        run: |
+          for file in .dockerignore Dockerfile Dockerfile-alpine Dockerfile-tor Dockerfile-msf entrypoint.sh entrypoint-msf.sh; do
+            if [[ ! -f "$file" ]]; then
+              echo "❌ Required file $file not found"
+              exit 1
+            fi
+          done
+          echo "✅ All required files present"
+
+      - name: Copy build context
+        run: |
+          echo "📋 Copying build files to sqlmap directory..."
+          cp -v .dockerignore Dockerfile* entrypoint.sh entrypoint-msf.sh sqlmap/
+
+          if [[ "$(git -C sqlmap rev-parse HEAD)" != "${{ needs.prepare.outputs.upstream-sha }}" ]]; then
+            echo "Checked out an unexpected SQLMap revision" >&2
+            exit 1
+          fi
+          
+          echo "📁 Build context contents:"
+          ls -la sqlmap/
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
+
+      - name: Log in to Docker Hub
+        if: needs.prepare.outputs.should-push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # Use secret directly - job outputs containing secrets are skipped by GitHub Actions
+          images: ${{ secrets.DOCKER_HUB_USERNAME && format('{0}/sqlmap', secrets.DOCKER_HUB_USERNAME) || 'local/sqlmap' }}
+          tags: |
+            type=raw,value=latest${{ matrix.variant.tag-suffix }}${{ needs.prepare.outputs.image-tag-suffix }}
+            type=ref,event=pr,suffix=${{ matrix.variant.tag-suffix }}
+            type=raw,value=upstream-${{ needs.prepare.outputs.upstream-sha }}${{ matrix.variant.tag-suffix }}
+            type=raw,value=build-${{ needs.prepare.outputs.source-short-sha }}-upstream-${{ needs.prepare.outputs.upstream-short-sha }}${{ matrix.variant.tag-suffix }}
+          labels: |
+            org.opencontainers.image.title=SQLMap ${{ matrix.variant.name }}
+            org.opencontainers.image.description=Automatic SQL injection and database takeover tool (${{ matrix.variant.name }} variant)
+            org.opencontainers.image.vendor=SQLMap Project
+            org.opencontainers.image.source=https://github.com/${{ env.SQLMAP_REPOSITORY }}
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.upstream-sha }}
+            io.github.googlesky.sqlmap.build-revision=${{ github.sha }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sqlmap
+          file: ./sqlmap/${{ matrix.variant.dockerfile }}
+          platforms: ${{ matrix.variant.platforms }}
+          push: ${{ needs.prepare.outputs.should-push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            WEBSOCKET_CLIENT=${{ env.WEBSOCKET_CLIENT }}
+            BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          cache-from: type=gha,scope=${{ matrix.variant.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant.name }}
+          provenance: false
+          sbom: false
+
+      - name: Output image details
+        run: |
+          echo "🐳 **${{ matrix.variant.name }} Image Details**"
+          echo "📋 **Tags:** ${{ steps.meta.outputs.tags }}"
+          echo "🔍 **Digest:** ${{ steps.build.outputs.digest }}"
+          echo "🏗️ **Platforms:** ${{ matrix.variant.platforms }}"
+          echo "📌 **SQLMap revision:** ${{ needs.prepare.outputs.upstream-sha }}"
+          if [[ "${{ needs.prepare.outputs.should-push }}" == "true" ]]; then
+            echo "✅ **Status:** Pushed to Docker Hub"
+          else
+            echo "🔧 **Status:** Built only (not pushed)"
+          fi
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [prepare, docker-build]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Variant | Status | Pushed |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          variants=("main" "alpine" "tor" "msf")
+          for variant in "${variants[@]}"; do
+            if [[ "${{ needs.prepare.result }}" != "success" ]]; then
+              status="❌ Prepare failed"
+            elif [[ "${{ needs.prepare.outputs.should-build }}" != "true" ]]; then
+              status="⏭️ No upstream change"
+            elif [[ "${{ needs.docker-build.result }}" == "success" ]]; then
+              status="✅ Success"
+            else
+              status="❌ Failed"
+            fi
+            
+            if [[ "${{ needs.prepare.outputs.should-build }}" != "true" ]]; then
+              pushed="No"
+            elif [[ "${{ needs.prepare.outputs.should-push }}" == "true" ]]; then
+              pushed="Yes"
+            else
+              pushed="No"
+            fi
+            
+            echo "| $variant | $status | $pushed |" >> $GITHUB_STEP_SUMMARY
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ env.SQLMAP_REPOSITORY }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SQLMap revision:** ${{ needs.prepare.outputs.upstream-sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Decision:** ${{ needs.prepare.outputs.build-reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
+          fi

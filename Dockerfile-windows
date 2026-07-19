@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+SHELL ["cmd", "/S", "/C"]
+
+ARG WEBSOCKET_CLIENT=websocket-client==1.8.*
+
+# Install Python
+RUN curl -SL https://www.python.org/ftp/python/3.9.13/python-3.9.13-amd64.exe -o python-installer.exe && \
+    python-installer.exe /quiet InstallAllUsers=1 PrependPath=1 && \
+    del python-installer.exe
+
+# Install websocket-client
+RUN pip install ${WEBSOCKET_CLIENT}
+
+# Copy the application
+COPY . sqlmap-dev
+
+ENTRYPOINT ["python", "sqlmap-dev/sqlmap.py"]
+CMD ["-h"]

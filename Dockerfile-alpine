@@ -1,0 +1,9 @@
+FROM python:3-alpine
+COPY . sqlmap-dev
+ARG WEBSOCKET_CLIENT=websocket-client==1.8.*
+RUN apk update && apk add tor curl && \
+    pip install $WEBSOCKET_CLIENT && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+ENTRYPOINT ["uv","run","sqlmap-dev/sqlmap.py"]
+CMD ["-h"]
